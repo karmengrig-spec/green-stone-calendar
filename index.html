@@ -1,34 +1,31 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Guesthouse Calendar</title>
-  <link rel="stylesheet" href="./src/styles.css" />
+  <link rel="stylesheet" href="./src/styles.css">
 </head>
 <body>
-  <header class="app-header">
-    <div class="header-inner">
-      <h1 id="monthLabel">Month YYYY</h1>
-      <div class="controls">
-        <button id="prevBtn">◀</button>
-        <button id="todayBtn">Today</button>
-        <button id="nextBtn">▶</button>
-        <button id="exportBtn">Export CSV</button>
-      </div>
+  <header class="topbar">
+    <div class="safe"></div>
+    <div class="bar">
+      <button id="prev" aria-label="Previous month">‹</button>
+      <div class="month" id="monthLabel">Month YYYY</div>
+      <button id="next" aria-label="Next month">›</button>
+    </div>
+    <div class="bar buttons">
+      <button id="exportMonthBtn">Export Month</button>
+      <button id="exportAllBtn">Export CSV</button>
     </div>
   </header>
-  <main id="app"></main>
-  <template id="legendTemplate">
+  <main class="container">
     <div class="legend">
-      <span class="legend-item"><span class="chip chip-start"></span> Start</span>
-      <span class="legend-item"><span class="chip chip-mid"></span> Middle</span>
-      <span class="legend-item"><span class="chip chip-end"></span> End</span>
-      <span class="legend-item"><span class="chip chip-single"></span> Single</span>
-      <span class="legend-item"><span class="chip chip-tentative"></span> Selecting…</span>
+      <span class="dot dot-available"></span> Available
+      <span class="dot dot-booked"></span> Booked
     </div>
-  </template>
+    <div id="roomsGrid" class="rooms-grid"></div>
+  </main>
   <script type="module" src="./src/app.js"></script>
 </body>
 </html>
