@@ -10,15 +10,16 @@
   <header class="topbar">
     <div class="safe"></div>
     <div class="bar">
-      <button id="prev" aria-label="Previous month">‹</button>
+      <button id="prev" class="nav-btn" aria-label="Previous month">‹</button>
       <div class="month" id="monthLabel">Month YYYY</div>
-      <button id="next" aria-label="Next month">›</button>
+      <button id="next" class="nav-btn" aria-label="Next month">›</button>
     </div>
-    <div class="bar buttons">
-      <button id="exportMonthBtn">Export Month</button>
-      <button id="exportAllBtn">Export CSV</button>
+    <div class="bar buttons-row">
+      <button id="exportMonthBtn" class="pill-btn">Export Month</button>
+      <button id="exportAllBtn" class="pill-btn">Export CSV</button>
     </div>
   </header>
+
   <main class="container">
     <div class="legend">
       <span class="dot dot-available"></span> Available
@@ -26,6 +27,29 @@
     </div>
     <div id="roomsGrid" class="rooms-grid"></div>
   </main>
+
+  <div class="version-badge">v5.1</div>
+
+  <div id="sheetBackdrop" class="sheet-backdrop"></div>
+  <section id="sheet" class="sheet" aria-modal="true" aria-hidden="true" role="dialog">
+    <div class="sheet-handle"></div>
+    <h2 class="sheet-title">Booking Details</h2>
+    <form id="sheetForm" class="sheet-form">
+      <div class="row two">
+        <label><span>Start</span><input id="startInput" type="date" required></label>
+        <label><span>End</span><input id="endInput" type="date" required></label>
+      </div>
+      <label class="row"><span>Guest name</span><input id="nameInput" type="text" placeholder="Guest"></label>
+      <label class="row"><span>Note (optional)</span><textarea id="noteInput" rows="1" placeholder="e.g. Paid cash"></textarea></label>
+      <div class="sheet-actions">
+        <button id="deleteBtn" type="button" class="danger">Cancel booking</button>
+        <div class="spacer"></div>
+        <button id="closeBtn" type="button">Close</button>
+        <button id="saveBtn" type="submit" class="primary">Save</button>
+      </div>
+    </form>
+  </section>
+
   <script type="module" src="./src/app.js"></script>
 </body>
 </html>
