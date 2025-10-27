@@ -6,7 +6,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
 import {
   getFirestore, collection, addDoc, doc, getDoc, updateDoc, deleteDoc,
-  onSnapshot, query, where, serverTimestamp
+  onSnapshot, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
 
 // Your Firebase config
@@ -37,7 +37,7 @@ export async function signIn(email, password) {
 export async function signOutNow() { return await signOut(auth); }
 export { onAuthStateChanged };
 
-// Admin check: user is admin if a doc exists at /admins/{uid}
+// Admin check
 export async function userIsAdmin(uid) {
   if (!uid) return false;
   const snap = await getDoc(doc(db, "admins", uid));
@@ -46,4 +46,4 @@ export async function userIsAdmin(uid) {
 
 // Firestore exports
 export const bookingsCol = collection(db, "bookings");
-export { addDoc, doc, getDoc, updateDoc, deleteDoc, onSnapshot, query, where, serverTimestamp };
+export { addDoc, doc, getDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp };

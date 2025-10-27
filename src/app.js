@@ -2,7 +2,7 @@
 import {
   auth, onAuthStateChanged, createAccount, signIn, signOutNow,
   db, bookingsCol, addDoc, doc, updateDoc, deleteDoc,
-  onSnapshot, query, where, serverTimestamp, userIsAdmin
+  onSnapshot, serverTimestamp, userIsAdmin
 } from "./firebase.js";
 
 // ---- Calendar helpers ----
@@ -60,8 +60,8 @@ onAuthStateChanged(auth, async (u)=>{
 
 // ---- Month nav ----
 const monthLabelEl=document.getElementById('monthLabel');
-document.getElementById('prev').onclick=()=>{ const d=parseISO(state.view); d.setMonth(d.getMonth()-1); state.view=isoLocal(d); attachMonthListener(); };
-document.getElementById('next').onclick=()=>{ const d=parseISO(state.view); d.setMonth(d.getMonth()+1); state.view=isoLocal(d); attachMonthListener(); };
+document.getElementById('prev').onclick=()=>{ const d=parseISO(state.view); d.setMonth(d.getMonth()-1); state.view=isoLocal(d); paint(); };
+document.getElementById('next').onclick=()=>{ const d=parseISO(state.view); d.setMonth(d.getMonth()+1); state.view=isoLocal(d); paint(); };
 
 // ---- CSV Export ----
 document.getElementById('exportAllBtn').onclick=()=> downloadCSV('bookings.csv', flattenBookings());
@@ -78,25 +78,15 @@ function downloadCSV(filename,rows){
   const blob=new Blob([lines.join('\n')],{type:'text/csv;charset=utf-8;'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=filename; a.click(); URL.revokeObjectURL(url);
 }
 
-// ---- Firestore listener (index-free: single range on 'start') ----
+// ---- Global live listener (all bookings) ----
 function attachMonthListener(){
   if (unsub) { unsub(); unsub=null; }
-  const d=parseISO(state.view);
-  const startISO = isoLocal(new Date(d.getFullYear(), d.getMonth(), 1));
-  const endISO   = isoLocal(new Date(d.getFullYear(), d.getMonth()+1, 0));
-
-  const q = query(bookingsCol, where("start", "<=", endISO));
-  unsub = onSnapshot(q, (snap)=>{
-    const byRoom={}; for(const r of ROOMS) byRoom[r]=[];
-    snap.forEach(docSnap=>{
-      const b=docSnap.data();
-      // keep bookings overlapping the visible month
-      if (b.end >= startISO && b.start <= endISO) {
-        if(!byRoom[b.room]) byRoom[b.room]=[];
-        byRoom[b.room].push({ id: docSnap.id, ...b });
-      }
-    });
-    state.bookings = byRoom; paint();
+  unsub = onSnapshot(bookingsCol, (snap)=>{
+    // Keep everything in memory once; filter per month in paint()
+    const all=[];
+    snap.forEach(ds=> all.push({ id: ds.id, ...ds.data() }));
+    state._allBookings = all; // store raw list
+    paint();
   }, (err)=>{
     console.error(err);
     alert('Live update error: '+(err.message||err));
@@ -106,11 +96,30 @@ function attachMonthListener(){
 
 // ---- Render ----
 const roomsGrid=document.getElementById('roomsGrid');
+function currentMonthRange(){
+  const d=parseISO(state.view);
+  const startISO = isoLocal(new Date(d.getFullYear(), d.getMonth(), 1));
+  const endISO   = isoLocal(new Date(d.getFullYear(), d.getMonth()+1, 0));
+  return [startISO, endISO];
+}
+function monthBookingsByRoom(){
+  const [startISO, endISO] = currentMonthRange();
+  const byRoom={}; for(const r of ROOMS) byRoom[r]=[];
+  for(const b of (state._allBookings||[])){
+    if (b.end >= startISO && b.start <= endISO) {
+      if(!byRoom[b.room]) byRoom[b.room]=[];
+      byRoom[b.room].push(b);
+    }
+  }
+  return byRoom;
+}
 function flattenBookings(){
-  const rows=[]; for(const room of ROOMS){ for(const b of (state.bookings[room]||[])){ rows.push({room, ...b}); } } return rows;
+  const byRoom = monthBookingsByRoom();
+  const rows=[]; for(const room of ROOMS){ for(const b of (byRoom[room]||[])){ rows.push({room, ...b}); } } return rows;
 }
 function isBooked(room, dayISO){
-  return (state.bookings[room]||[]).some(b=> dayISO>=b.start && dayISO<=b.end);
+  const byRoom = monthBookingsByRoom();
+  return (byRoom[room]||[]).some(b=> dayISO>=b.start && dayISO<=b.end);
 }
 
 function paint(){
@@ -172,7 +181,8 @@ function closeSheet(){
 
 async function onDayTap(room,date){
   const dISO=isoLocal(date);
-  const list=state.bookings[room]||[];
+  const byRoom = monthBookingsByRoom();
+  const list=byRoom[room]||[];
   const hit=list.find(b=> dISO>=b.start && dISO<=b.end);
   if(hit){ openSheet('edit', room, hit); return; }
   openSheet('create', room, {start:dISO, end:dISO, name:'', note:''});
@@ -211,5 +221,5 @@ form.onsubmit = async (e)=>{
   }
 };
 
-// Initial render
+// Initial render (listener will populate bookings)
 paint();
