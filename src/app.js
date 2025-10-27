@@ -1,7 +1,7 @@
 
-// v5.7 — stronger portrait alignment
+// v5.8 — reverse iOS portrait nudge (move numbers slightly up)
 const ROOMS = ['Double','Twin','Deluxe','Standard','Family','Cottage','Sauna'];
-const STORAGE_KEY = 'guesthouse_calendar_v5_7';
+const STORAGE_KEY = 'guesthouse_calendar_v5_8';
 let state = loadState();
 function loadState(){ try{ const raw=localStorage.getItem(STORAGE_KEY); if(raw) return JSON.parse(raw);}catch(e){} return { view: isoLocal(new Date()), bookings: {}, tentative:null }; }
 function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
