@@ -1,12 +1,12 @@
 
-// v5.1
+// v5.2
 const ROOMS = ['Double','Twin','Deluxe','Standard','Family','Cottage','Sauna'];
-const STORAGE_KEY = 'guesthouse_calendar_v5_1';
+const STORAGE_KEY = 'guesthouse_calendar_v5_2';
 let state = loadState();
 function loadState(){ try{ const raw=localStorage.getItem(STORAGE_KEY); if(raw) return JSON.parse(raw);}catch(e){} return { view: iso(new Date()), bookings: {}, tentative:null }; }
 function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
 function startOfMonth(d){ const x=new Date(d.getFullYear(), d.getMonth(), 1); x.setHours(0,0,0,0); return x; }
-function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+function addDays(d,n){ const x = new Date(d); x.setDate(x.getDate()+n); return x; }
 function iso(d){ return d.toISOString().slice(0,10); }
 function parseISO(s){ const [y,m,dd]=s.split('-').map(Number); const d=new Date(y,m-1,dd); d.setHours(0,0,0,0); return d; }
 function weekdayLabels(){ const base=new Date(Date.UTC(2021,7,2)); return [...Array(7)].map((_,i)=>{ const d=new Date(base); d.setDate(d.getDate()+i); return d.toLocaleDateString('en-GB',{weekday:'narrow'}).toUpperCase(); }); }
@@ -14,8 +14,6 @@ function monthLabel(d){ return d.toLocaleDateString('en-GB',{month:'long',year:'
 function gridForMonth(d){ const start=startOfMonth(d); const startWeekDay=(start.getDay()+6)%7; const gridStart=addDays(start,-startWeekDay); const cells=[]; for(let i=0;i<42;i++) cells.push(addDays(gridStart,i)); return {cells,start}; }
 function sameDate(a,b){ return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
 function getBookings(room){ return state.bookings[room] || (state.bookings[room]=[]); }
-function overlapsAny(list,aISO,bISO,excludeId=null){ const A=aISO<bISO?aISO:bISO; const B=aISO<bISO?bISO:aISO; return list.some(x=>x.id!==excludeId && !(B<x.start || A>x.end)); }
-function clampRange(a,b){ let s=a,e=b; if(e<s){ const t=s;s=e;e=t;} return [s,e]; }
 function isBooked(room, dayISO){ return getBookings(room).some(b=> dayISO>=b.start && dayISO<=b.end); }
 
 const roomsGrid=document.getElementById('roomsGrid'); const monthLabelEl=document.getElementById('monthLabel');
@@ -58,6 +56,7 @@ function paint(){
     card.appendChild(grid); card.appendChild(title); roomsGrid.appendChild(card);
   }
 }
+
 function onDayTap(room,date){
   const dISO=iso(date); const list=getBookings(room); const hit=list.find(b=> dISO>=b.start && dISO<=b.end );
   if(hit){ openSheet('edit', room, hit); return; }
@@ -71,10 +70,12 @@ function openSheet(mode, room, booking){
   startInput.value=booking.start; endInput.value=booking.end; nameInput.value=booking.name||''; noteInput.value=booking.note||''; autosize(noteInput);
   deleteBtn.style.display = mode==='edit' ? 'inline-block' : 'none';
   deleteBtn.onclick=()=>{ if(mode!=='edit')return; const list=getBookings(room); const idx=list.findIndex(x=>x.id===booking.id); if(idx>=0) list.splice(idx,1); save(); closeSheet(); paint(); };
-  closeBtn.onclick=()=>{ closeSheet(); };
-  backdrop.onclick=closeBtn.onclick;
-  noteInput.oninput=()=> autosize(noteInput);
-  form.onsubmit=(e)=>{ e.preventDefault(); const s=startInput.value, eDate=endInput.value; const [ss,ee]=s<=eDate?[s,eDate]:[eDate,s]; const list=getBookings(room); const exclude=mode==='edit'?booking.id:null; if(overlapsAny(list,ss,ee,exclude)){ alert('Those dates overlap another booking.'); return; } if(mode==='create'){ list.push({id:crypto.randomUUID(),start:ss,end:ee,name:nameInput.value||'',note:noteInput.value||''}); list.sort((a,b)=>a.start.localeCompare(b.start)); } else { booking.start=ss; booking.end=ee; booking.name=nameInput.value||''; booking.note=noteInput.value||''; } save(); closeSheet(); paint(); };
+  closeBtn.onclick=()=>{ closeSheet(); }; backdrop.onclick=closeBtn.onclick; noteInput.oninput=()=> autosize(noteInput);
+  form.onsubmit=(e)=>{ e.preventDefault(); const s=startInput.value, eDate=endInput.value; const [ss,ee]=s<=eDate?[s,eDate]:[eDate,s]; const list=getBookings(room);
+    if(mode==='edit'){ const excludeId=booking.id; if(list.some(x=> x.id!==excludeId && !(ee<x.start || ss>x.end))){ alert('Those dates overlap another booking.'); return; } booking.start=ss; booking.end=ee; booking.name=nameInput.value||''; booking.note=noteInput.value||''; }
+    else { if(list.some(x=> !(ee<x.start || ss>x.end))){ alert('Those dates overlap another booking.'); return; } list.push({id:crypto.randomUUID(),start:ss,end:ee,name:nameInput.value||'',note:noteInput.value||''}); list.sort((a,b)=>a.start.localeCompare(b.start)); }
+    save(); closeSheet(); paint();
+  };
 }
 function closeSheet(){ sheet.classList.remove('open'); backdrop.classList.remove('open'); sheet.setAttribute('aria-hidden','true'); document.body.style.overflow='auto'; }
 paint();
