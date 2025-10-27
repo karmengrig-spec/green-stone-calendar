@@ -1,7 +1,7 @@
 
-// v5.4 — same logic as v5.3; CSS centers numbers perfectly
+// v5.5 — adds inner span .num for precise vertical centering (iOS nudge)
 const ROOMS = ['Double','Twin','Deluxe','Standard','Family','Cottage','Sauna'];
-const STORAGE_KEY = 'guesthouse_calendar_v5_4';
+const STORAGE_KEY = 'guesthouse_calendar_v5_5';
 let state = loadState();
 function loadState(){ try{ const raw=localStorage.getItem(STORAGE_KEY); if(raw) return JSON.parse(raw);}catch(e){} return { view: isoLocal(new Date()), bookings: {}, tentative:null }; }
 function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
@@ -45,7 +45,7 @@ function paint(){
       const el=document.createElement('div'); const outside=day.getMonth()!==d.getMonth();
       el.className='day '+(outside?'out':'');
       if(!outside){
-        el.classList.add('free'); el.textContent=day.getDate(); const dISO=isoLocal(day);
+        el.classList.add('free'); el.innerHTML = `<span class="num">${day.getDate()}</span>`; const dISO=isoLocal(day);
         if(isBooked(room,dISO)){ el.classList.remove('free'); el.classList.add('busy'); }
         if(sameDate(day,new Date())) el.classList.add('today');
         el.onclick=()=>onDayTap(room,day);
@@ -74,7 +74,7 @@ function openSheet(mode, room, booking){
   closeBtn.onclick=()=>{ closeSheet(); }; backdrop.onclick=closeBtn.onclick; noteInput.oninput=()=> autosize(noteInput);
   form.onsubmit=(e)=>{ e.preventDefault(); const s=startInput.value, eDate=endInput.value; const [ss,ee]=s<=eDate?[s,eDate]:[eDate,s]; const list=getBookings(room);
     if(mode==='edit'){ const excludeId=booking.id; if(list.some(x=> x.id!==excludeId && !(ee<x.start || ss>x.end))){ alert('Those dates overlap another booking.'); return; } booking.start=ss; booking.end=ee; booking.name=nameInput.value||''; booking.note=noteInput.value||''; }
-    else { if(list.some(x=> !(ee<x.start || ss>x.end))){ alert('Those dates overlap another booking.'); return; } list.push({id:crypto.randomUUID(),start:ss,end:ee,name:nameInput.value||'',note:noteInput.value||''}); list.sort((a,b)=>a.start.localeCompare(b.start)); }
+    else { if(list.some(x=> !(ee<x.start || ss>x.end))){ alert('Those dates overlap another booking.'); return; } list.push({id:crypto.randomUUID(),start:ss,end:ee,name:nameInput.value||'',note:nameInput.value?noteInput.value:''}); list.sort((a,b)=>a.start.localeCompare(b.start)); }
     save(); closeSheet(); paint();
   };
 }
