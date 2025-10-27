@@ -1,7 +1,7 @@
 
-// v5.9 — iPhone 13 Pro portrait alignment tweak
+// v6.0 — runtime auto-calibration for date number vertical centering
 const ROOMS = ['Double','Twin','Deluxe','Standard','Family','Cottage','Sauna'];
-const STORAGE_KEY = 'guesthouse_calendar_v5_9';
+const STORAGE_KEY = 'guesthouse_calendar_v6_0';
 let state = loadState();
 function loadState(){ try{ const raw=localStorage.getItem(STORAGE_KEY); if(raw) return JSON.parse(raw);}catch(e){} return { view: isoLocal(new Date()), bookings: {}, tentative:null }; }
 function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
@@ -30,13 +30,7 @@ document.getElementById('exportMonthBtn').onclick=()=>{
   const rows=[]; for(const room of ROOMS){ for(const b of getBookings(room)){ if(!(b.end<s || b.start>e)) rows.push({room,start:b.start,end:b.end,name:b.name||'',note:b.note||''}); } }
   downloadCSV(`bookings-${y}-${String(m).padStart(2,'0')}.csv`, rows);
 };
-function downloadCSV(filename,rows){
-  const head=['room','start_date','end_date','guest_name','note'];
-  const esc=v=>(''+v).replace(/"/g,'""');
-  const lines=[head.join(',')].concat(rows.map(r=>[`"${esc(r.room)}"`,`"${esc(r.start)}"`,`"${esc(r.end)}"`,`"${esc(r.name)}"`,`"${esc(r.note)}"`].join(',')));
-  const blob=new Blob([lines.join('\n')],{type:'text/csv;charset=utf-8;'});
-  const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=filename; a.click(); URL.revokeObjectURL(url);
-}
+function downloadCSV(filename,rows){ const head=['room','start_date','end_date','guest_name','note']; const esc=v=>(''+v).replace(/"/g,'""'); const lines=[head.join(',')].concat(rows.map(r=>[`"${esc(r.room)}"`,`"${esc(r.start)}"`,`"${esc(r.end)}"`,`"${esc(r.name)}"`,`"${esc(r.note)}"`].join(','))); const blob=new Blob([lines.join('\n')],{type:'text/csv;charset=utf-8;'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=filename; a.click(); URL.revokeObjectURL(url); }
 
 function paint(){
   const d=parseISO(state.view); monthLabelEl.textContent=monthLabel(d); roomsGrid.innerHTML=''; const weekdays=weekdayLabels();
@@ -61,7 +55,35 @@ function paint(){
     const title=document.createElement('div'); title.className='room-title'; title.textContent=room;
     card.appendChild(grid); card.appendChild(title); roomsGrid.appendChild(card);
   }
+  calibrateNumbers();
 }
+
+// Auto-calibration for vertical centering
+function calibrateNumbers(){
+  // Create a temporary pill to measure vertical center difference
+  const probe=document.createElement('div');
+  probe.className='day';
+  probe.style.position='absolute';
+  probe.style.visibility='hidden';
+  probe.style.pointerEvents='none';
+  probe.innerHTML='<span class="num">27</span>';
+  document.body.appendChild(probe);
+  // Wait for layout
+  requestAnimationFrame(()=>{
+    const pill=probe.getBoundingClientRect();
+    const num=probe.querySelector('.num').getBoundingClientRect();
+    const pillCenter=(pill.top+pill.bottom)/2;
+    const numCenter=(num.top+num.bottom)/2;
+    const delta = Math.round((numCenter - pillCenter)*10)/10; // px
+    // Move number by negative delta so it centers
+    document.documentElement.style.setProperty('--num-nudge', `${-delta}px`);
+    document.body.removeChild(probe);
+  });
+}
+
+// Recalibrate on orientation change / resize
+window.addEventListener('orientationchange', ()=> setTimeout(calibrateNumbers, 300));
+window.addEventListener('resize', ()=> setTimeout(calibrateNumbers, 150));
 
 function onDayTap(room,date){
   const dISO=isoLocal(date); const list=getBookings(room); const hit=list.find(b=> dISO>=b.start && dISO<=b.end );
@@ -70,47 +92,19 @@ function onDayTap(room,date){
 }
 
 // Bottom sheet
-const sheet=document.getElementById('sheet'); const backdrop=document.getElementById('sheetBackdrop'); const form=document.getElementById('sheetForm');
-const startInput=document.getElementById('startInput'); const endInput=document.getElementById('endInput');
-const nameInput=document.getElementById('nameInput'); const noteInput=document.getElementById('noteInput');
-const deleteBtn=document.getElementById('deleteBtn'); const closeBtn=document.getElementById('closeBtn');
-
+const sheet=document.getElementById('sheet'); const backdrop=document.getElementById('sheetBackdrop'); const form=document.getElementById('sheetForm'); const startInput=document.getElementById('startInput'); const endInput=document.getElementById('endInput'); const nameInput=document.getElementById('nameInput'); const noteInput=document.getElementById('noteInput'); const deleteBtn=document.getElementById('deleteBtn'); const closeBtn=document.getElementById('closeBtn');
 function autosize(el){ el.style.height='auto'; el.style.height=(el.scrollHeight)+'px'; }
-
 function openSheet(mode, room, booking){
   sheet.classList.add('open'); backdrop.classList.add('open'); sheet.setAttribute('aria-hidden','false'); document.body.style.overflow='hidden';
   startInput.value=booking.start; endInput.value=booking.end; nameInput.value=booking.name||''; noteInput.value=booking.note||''; autosize(noteInput);
   deleteBtn.style.display = mode==='edit' ? 'inline-block' : 'none';
-  deleteBtn.onclick=()=>{
-    if(mode!=='edit')return;
-    const list=getBookings(room); const idx=list.findIndex(x=>x.id===booking.id);
-    if(idx>=0) list.splice(idx,1);
-    save(); closeSheet(); paint();
-  };
-  closeBtn.onclick=()=>{ closeSheet(); }; backdrop.onclick=closeBtn.onclick;
-  noteInput.oninput=()=> autosize(noteInput);
-
-  form.onsubmit=(e)=>{
-    e.preventDefault();
-    const s=startInput.value, eDate=endInput.value;
-    const [ss,ee]=s<=eDate?[s,eDate]:[eDate,s];
-    const list=getBookings(room);
-    if(mode==='edit'){
-      const excludeId=booking.id;
-      if(list.some(x=> x.id!==excludeId && !(ee<x.start || ss>x.end))){ alert('Those dates overlap another booking.'); return; }
-      booking.start=ss; booking.end=ee; booking.name=nameInput.value||''; booking.note=noteInput.value||'';
-    } else {
-      if(list.some(x=> !(ee<x.start || ss>x.end))){ alert('Those dates overlap another booking.'); return; }
-      list.push({id:crypto.randomUUID(),start:ss,end:ee,name:nameInput.value||'',note:noteInput.value||''});
-      list.sort((a,b)=>a.start.localeCompare(b.start));
-    }
+  deleteBtn.onclick=()=>{ if(mode!=='edit')return; const list=getBookings(room); const idx=list.findIndex(x=>x.id===booking.id); if(idx>=0) list.splice(idx,1); save(); closeSheet(); paint(); };
+  closeBtn.onclick=()=>{ closeSheet(); }; backdrop.onclick=closeBtn.onclick; noteInput.oninput=()=> autosize(noteInput);
+  form.onsubmit=(e)=>{ e.preventDefault(); const s=startInput.value, eDate=endInput.value; const [ss,ee]=s<=eDate?[s,eDate]:[eDate,s]; const list=getBookings(room);
+    if(mode==='edit'){ const excludeId=booking.id; if(list.some(x=> x.id!==excludeId && !(ee<x.start || ss>x.end))){ alert('Those dates overlap another booking.'); return; } booking.start=ss; booking.end=ee; booking.name=nameInput.value||''; booking.note=noteInput.value||''; }
+    else { if(list.some(x=> !(ee<x.start || ss>x.end))){ alert('Those dates overlap another booking.'); return; } list.push({id:crypto.randomUUID(),start:ss,end:ee,name:nameInput.value||'',note:noteInput.value||''}); list.sort((a,b)=>a.start.localeCompare(b.start)); }
     save(); closeSheet(); paint();
   };
 }
-
-function closeSheet(){
-  sheet.classList.remove('open'); backdrop.classList.remove('open');
-  sheet.setAttribute('aria-hidden','true'); document.body.style.overflow='auto';
-}
-
+function closeSheet(){ sheet.classList.remove('open'); backdrop.classList.remove('open'); sheet.setAttribute('aria-hidden','true'); document.body.style.overflow='auto'; }
 paint();

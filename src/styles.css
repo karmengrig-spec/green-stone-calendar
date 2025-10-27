@@ -27,16 +27,9 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:ui-sans-serif,s
 .month-head{display:grid;grid-template-columns:repeat(7,1fr);gap:.25rem;padding:.25rem .4rem 0;color:var(--muted);font-size:.75rem}
 .wk{text-align:center}
 
-/* Centered numbers */
+/* Centered numbers with runtime nudge */
 .day{display:flex;align-items:center;justify-content:center;height:1.9rem;border-radius:999px;border:1px solid var(--border);background:var(--green);color:var(--green-text);user-select:none;cursor:pointer;font-weight:700;font-size:.9rem;line-height:1}
 .day .num{display:inline-block;transform:translateY(var(--num-nudge));}
-
-/* iOS-specific adjustment; stronger portrait nudge UP for iPhone 13 Pro */
-@supports (-webkit-touch-callout: none) {
-  :root{ --num-nudge: 0px; }
-  @media (orientation: portrait) { :root{ --num-nudge: -2.2px; } }
-  @media (orientation: landscape) { :root{ --num-nudge: 0px; } }
-}
 
 .day.out{opacity:.25;pointer-events:none}
 .day.today{outline:2px solid #60a5fa;outline-offset:0}
