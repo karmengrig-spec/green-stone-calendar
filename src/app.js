@@ -1,7 +1,7 @@
 
-// v5.3 — fix timezone shift by using local YYYY-MM-DD
+// v5.4 — same logic as v5.3; CSS centers numbers perfectly
 const ROOMS = ['Double','Twin','Deluxe','Standard','Family','Cottage','Sauna'];
-const STORAGE_KEY = 'guesthouse_calendar_v5_3';
+const STORAGE_KEY = 'guesthouse_calendar_v5_4';
 let state = loadState();
 function loadState(){ try{ const raw=localStorage.getItem(STORAGE_KEY); if(raw) return JSON.parse(raw);}catch(e){} return { view: isoLocal(new Date()), bookings: {}, tentative:null }; }
 function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
