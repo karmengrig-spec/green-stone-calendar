@@ -18,6 +18,8 @@
       <button id="exportMonthBtn" class="pill-btn">Export Month</button>
       <button id="exportAllBtn" class="pill-btn">Export CSV</button>
     </div>
+
+    <!-- Auth bar -->
     <div class="bar auth-bar">
       <div class="auth-left">
         <input id="emailInput" type="email" placeholder="email@domain.com" autocomplete="username" />
@@ -31,6 +33,7 @@
       </div>
     </div>
   </header>
+
   <main class="container">
     <div class="legend">
       <span class="dot dot-available"></span> Available
@@ -38,7 +41,9 @@
     </div>
     <div id="roomsGrid" class="rooms-grid"></div>
   </main>
-  <div class="version-badge">v7.1</div>
+
+  <div class="version-badge">v7.2</div>
+
   <div id="sheetBackdrop" class="sheet-backdrop"></div>
   <section id="sheet" class="sheet" aria-modal="true" aria-hidden="true" role="dialog">
     <div class="sheet-handle"></div>
@@ -58,6 +63,7 @@
       </div>
     </form>
   </section>
+
   <script type="module" src="./src/firebase.js"></script>
   <script type="module" src="./src/app.js"></script>
 </body>

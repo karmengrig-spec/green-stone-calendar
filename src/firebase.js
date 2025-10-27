@@ -9,7 +9,8 @@ import {
   onSnapshot, query, where, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
 
-const firebaseConfig = {
+// Your Firebase config
+export const firebaseConfig = {
   apiKey: "AIzaSyACYY5Or9OGv98y9fDxVUqEUzro2CbpoVE",
   authDomain: "green-stone-calendar.firebaseapp.com",
   projectId: "green-stone-calendar",
@@ -23,8 +24,10 @@ export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
+// Persist sessions
 setPersistence(auth, browserLocalPersistence);
 
+// Auth helpers
 export async function createAccount(email, password) {
   return await createUserWithEmailAndPassword(auth, email, password);
 }
@@ -34,11 +37,13 @@ export async function signIn(email, password) {
 export async function signOutNow() { return await signOut(auth); }
 export { onAuthStateChanged };
 
+// Admin check: user is admin if a doc exists at /admins/{uid}
 export async function userIsAdmin(uid) {
   if (!uid) return false;
   const snap = await getDoc(doc(db, "admins", uid));
   return snap.exists();
 }
 
+// Firestore exports
 export const bookingsCol = collection(db, "bookings");
 export { addDoc, doc, getDoc, updateDoc, deleteDoc, onSnapshot, query, where, serverTimestamp };
