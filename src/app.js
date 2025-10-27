@@ -1,13 +1,13 @@
 
-// v5.2
+// v5.3 — fix timezone shift by using local YYYY-MM-DD
 const ROOMS = ['Double','Twin','Deluxe','Standard','Family','Cottage','Sauna'];
-const STORAGE_KEY = 'guesthouse_calendar_v5_2';
+const STORAGE_KEY = 'guesthouse_calendar_v5_3';
 let state = loadState();
-function loadState(){ try{ const raw=localStorage.getItem(STORAGE_KEY); if(raw) return JSON.parse(raw);}catch(e){} return { view: iso(new Date()), bookings: {}, tentative:null }; }
+function loadState(){ try{ const raw=localStorage.getItem(STORAGE_KEY); if(raw) return JSON.parse(raw);}catch(e){} return { view: isoLocal(new Date()), bookings: {}, tentative:null }; }
 function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
 function startOfMonth(d){ const x=new Date(d.getFullYear(), d.getMonth(), 1); x.setHours(0,0,0,0); return x; }
 function addDays(d,n){ const x = new Date(d); x.setDate(x.getDate()+n); return x; }
-function iso(d){ return d.toISOString().slice(0,10); }
+function isoLocal(d){ const y=d.getFullYear(); const m=String(d.getMonth()+1).padStart(2,'0'); const dd=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${dd}`; }
 function parseISO(s){ const [y,m,dd]=s.split('-').map(Number); const d=new Date(y,m-1,dd); d.setHours(0,0,0,0); return d; }
 function weekdayLabels(){ const base=new Date(Date.UTC(2021,7,2)); return [...Array(7)].map((_,i)=>{ const d=new Date(base); d.setDate(d.getDate()+i); return d.toLocaleDateString('en-GB',{weekday:'narrow'}).toUpperCase(); }); }
 function monthLabel(d){ return d.toLocaleDateString('en-GB',{month:'long',year:'numeric'}); }
@@ -17,8 +17,8 @@ function getBookings(room){ return state.bookings[room] || (state.bookings[room]
 function isBooked(room, dayISO){ return getBookings(room).some(b=> dayISO>=b.start && dayISO<=b.end); }
 
 const roomsGrid=document.getElementById('roomsGrid'); const monthLabelEl=document.getElementById('monthLabel');
-document.getElementById('prev').onclick=()=>{ const d=parseISO(state.view); d.setMonth(d.getMonth()-1); state.view=iso(d); paint(); save(); };
-document.getElementById('next').onclick=()=>{ const d=parseISO(state.view); d.setMonth(d.getMonth()+1); state.view=iso(d); paint(); save(); };
+document.getElementById('prev').onclick=()=>{ const d=parseISO(state.view); d.setMonth(d.getMonth()-1); state.view=isoLocal(d); paint(); save(); };
+document.getElementById('next').onclick=()=>{ const d=parseISO(state.view); d.setMonth(d.getMonth()+1); state.view=isoLocal(d); paint(); save(); };
 
 document.getElementById('exportAllBtn').onclick=()=>{
   const rows=[]; for(const room of ROOMS){ for(const b of getBookings(room)){ rows.push({room,start:b.start,end:b.end,name:b.name||'',note:b.note||''}); } }
@@ -26,7 +26,7 @@ document.getElementById('exportAllBtn').onclick=()=>{
 };
 document.getElementById('exportMonthBtn').onclick=()=>{
   const d=parseISO(state.view), m=d.getMonth()+1, y=d.getFullYear();
-  const s=iso(new Date(y,m-1,1)), e=iso(new Date(y,m,0));
+  const s=isoLocal(new Date(y,m-1,1)), e=isoLocal(new Date(y,m,0));
   const rows=[]; for(const room of ROOMS){ for(const b of getBookings(room)){ if(!(b.end<s || b.start>e)) rows.push({room,start:b.start,end:b.end,name:b.name||'',note:b.note||''}); } }
   downloadCSV(`bookings-${y}-${String(m).padStart(2,'0')}.csv`, rows);
 };
@@ -45,7 +45,7 @@ function paint(){
       const el=document.createElement('div'); const outside=day.getMonth()!==d.getMonth();
       el.className='day '+(outside?'out':'');
       if(!outside){
-        el.classList.add('free'); el.textContent=day.getDate(); const dISO=iso(day);
+        el.classList.add('free'); el.textContent=day.getDate(); const dISO=isoLocal(day);
         if(isBooked(room,dISO)){ el.classList.remove('free'); el.classList.add('busy'); }
         if(sameDate(day,new Date())) el.classList.add('today');
         el.onclick=()=>onDayTap(room,day);
@@ -58,11 +58,12 @@ function paint(){
 }
 
 function onDayTap(room,date){
-  const dISO=iso(date); const list=getBookings(room); const hit=list.find(b=> dISO>=b.start && dISO<=b.end );
+  const dISO=isoLocal(date); const list=getBookings(room); const hit=list.find(b=> dISO>=b.start && dISO<=b.end );
   if(hit){ openSheet('edit', room, hit); return; }
   openSheet('create', room, {start:dISO, end:dISO, name:'', note:''});
 }
 
+// Bottom sheet
 const sheet=document.getElementById('sheet'); const backdrop=document.getElementById('sheetBackdrop'); const form=document.getElementById('sheetForm'); const startInput=document.getElementById('startInput'); const endInput=document.getElementById('endInput'); const nameInput=document.getElementById('nameInput'); const noteInput=document.getElementById('noteInput'); const deleteBtn=document.getElementById('deleteBtn'); const closeBtn=document.getElementById('closeBtn');
 function autosize(el){ el.style.height='auto'; el.style.height=(el.scrollHeight)+'px'; }
 function openSheet(mode, room, booking){
