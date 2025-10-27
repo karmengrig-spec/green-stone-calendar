@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Guesthouse Calendar</title>
-  <link rel="stylesheet" href="./src/styles.css">
+  <link rel="stylesheet" href="./src/styles.css" />
 </head>
 <body>
   <header class="topbar">
@@ -19,6 +19,7 @@
       <button id="exportAllBtn" class="pill-btn">Export CSV</button>
     </div>
   </header>
+
   <main class="container">
     <div class="legend">
       <span class="dot dot-available"></span> Available
@@ -26,7 +27,9 @@
     </div>
     <div id="roomsGrid" class="rooms-grid"></div>
   </main>
-  <div class="version-badge">v5.8</div>
+
+  <div class="version-badge">v5.9</div>
+
   <div id="sheetBackdrop" class="sheet-backdrop"></div>
   <section id="sheet" class="sheet" aria-modal="true" aria-hidden="true" role="dialog">
     <div class="sheet-handle"></div>
@@ -46,6 +49,7 @@
       </div>
     </form>
   </section>
+
   <script type="module" src="./src/app.js"></script>
 </body>
 </html>

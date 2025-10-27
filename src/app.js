@@ -1,7 +1,7 @@
 
-// v5.8 — reverse iOS portrait nudge (move numbers slightly up)
+// v5.9 — iPhone 13 Pro portrait alignment tweak
 const ROOMS = ['Double','Twin','Deluxe','Standard','Family','Cottage','Sauna'];
-const STORAGE_KEY = 'guesthouse_calendar_v5_8';
+const STORAGE_KEY = 'guesthouse_calendar_v5_9';
 let state = loadState();
 function loadState(){ try{ const raw=localStorage.getItem(STORAGE_KEY); if(raw) return JSON.parse(raw);}catch(e){} return { view: isoLocal(new Date()), bookings: {}, tentative:null }; }
 function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
@@ -30,7 +30,13 @@ document.getElementById('exportMonthBtn').onclick=()=>{
   const rows=[]; for(const room of ROOMS){ for(const b of getBookings(room)){ if(!(b.end<s || b.start>e)) rows.push({room,start:b.start,end:b.end,name:b.name||'',note:b.note||''}); } }
   downloadCSV(`bookings-${y}-${String(m).padStart(2,'0')}.csv`, rows);
 };
-function downloadCSV(filename,rows){ const head=['room','start_date','end_date','guest_name','note']; const esc=v=>(''+v).replace(/"/g,'""'); const lines=[head.join(',')].concat(rows.map(r=>[`"${esc(r.room)}"`,`"${esc(r.start)}"`,`"${esc(r.end)}"`,`"${esc(r.name)}"`,`"${esc(r.note)}"`].join(','))); const blob=new Blob([lines.join('\n')],{type:'text/csv;charset=utf-8;'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=filename; a.click(); URL.revokeObjectURL(url); }
+function downloadCSV(filename,rows){
+  const head=['room','start_date','end_date','guest_name','note'];
+  const esc=v=>(''+v).replace(/"/g,'""');
+  const lines=[head.join(',')].concat(rows.map(r=>[`"${esc(r.room)}"`,`"${esc(r.start)}"`,`"${esc(r.end)}"`,`"${esc(r.name)}"`,`"${esc(r.note)}"`].join(',')));
+  const blob=new Blob([lines.join('\n')],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=filename; a.click(); URL.revokeObjectURL(url);
+}
 
 function paint(){
   const d=parseISO(state.view); monthLabelEl.textContent=monthLabel(d); roomsGrid.innerHTML=''; const weekdays=weekdayLabels();
@@ -64,19 +70,47 @@ function onDayTap(room,date){
 }
 
 // Bottom sheet
-const sheet=document.getElementById('sheet'); const backdrop=document.getElementById('sheetBackdrop'); const form=document.getElementById('sheetForm'); const startInput=document.getElementById('startInput'); const endInput=document.getElementById('endInput'); const nameInput=document.getElementById('nameInput'); const noteInput=document.getElementById('noteInput'); const deleteBtn=document.getElementById('deleteBtn'); const closeBtn=document.getElementById('closeBtn');
+const sheet=document.getElementById('sheet'); const backdrop=document.getElementById('sheetBackdrop'); const form=document.getElementById('sheetForm');
+const startInput=document.getElementById('startInput'); const endInput=document.getElementById('endInput');
+const nameInput=document.getElementById('nameInput'); const noteInput=document.getElementById('noteInput');
+const deleteBtn=document.getElementById('deleteBtn'); const closeBtn=document.getElementById('closeBtn');
+
 function autosize(el){ el.style.height='auto'; el.style.height=(el.scrollHeight)+'px'; }
+
 function openSheet(mode, room, booking){
   sheet.classList.add('open'); backdrop.classList.add('open'); sheet.setAttribute('aria-hidden','false'); document.body.style.overflow='hidden';
   startInput.value=booking.start; endInput.value=booking.end; nameInput.value=booking.name||''; noteInput.value=booking.note||''; autosize(noteInput);
   deleteBtn.style.display = mode==='edit' ? 'inline-block' : 'none';
-  deleteBtn.onclick=()=>{ if(mode!=='edit')return; const list=getBookings(room); const idx=list.findIndex(x=>x.id===booking.id); if(idx>=0) list.splice(idx,1); save(); closeSheet(); paint(); };
-  closeBtn.onclick=()=>{ closeSheet(); }; backdrop.onclick=closeBtn.onclick; noteInput.oninput=()=> autosize(noteInput);
-  form.onsubmit=(e)=>{ e.preventDefault(); const s=startInput.value, eDate=endInput.value; const [ss,ee]=s<=eDate?[s,eDate]:[eDate,s]; const list=getBookings(room);
-    if(mode==='edit'){ const excludeId=booking.id; if(list.some(x=> x.id!==excludeId && !(ee<x.start || ss>x.end))){ alert('Those dates overlap another booking.'); return; } booking.start=ss; booking.end=ee; booking.name=nameInput.value||''; booking.note=noteInput.value||''; }
-    else { if(list.some(x=> !(ee<x.start || ss>x.end))){ alert('Those dates overlap another booking.'); return; } list.push({id:crypto.randomUUID(),start:ss,end:ee,name:nameInput.value||'',note:noteInput.value||''}); list.sort((a,b)=>a.start.localeCompare(b.start)); }
+  deleteBtn.onclick=()=>{
+    if(mode!=='edit')return;
+    const list=getBookings(room); const idx=list.findIndex(x=>x.id===booking.id);
+    if(idx>=0) list.splice(idx,1);
+    save(); closeSheet(); paint();
+  };
+  closeBtn.onclick=()=>{ closeSheet(); }; backdrop.onclick=closeBtn.onclick;
+  noteInput.oninput=()=> autosize(noteInput);
+
+  form.onsubmit=(e)=>{
+    e.preventDefault();
+    const s=startInput.value, eDate=endInput.value;
+    const [ss,ee]=s<=eDate?[s,eDate]:[eDate,s];
+    const list=getBookings(room);
+    if(mode==='edit'){
+      const excludeId=booking.id;
+      if(list.some(x=> x.id!==excludeId && !(ee<x.start || ss>x.end))){ alert('Those dates overlap another booking.'); return; }
+      booking.start=ss; booking.end=ee; booking.name=nameInput.value||''; booking.note=noteInput.value||'';
+    } else {
+      if(list.some(x=> !(ee<x.start || ss>x.end))){ alert('Those dates overlap another booking.'); return; }
+      list.push({id:crypto.randomUUID(),start:ss,end:ee,name:nameInput.value||'',note:noteInput.value||''});
+      list.sort((a,b)=>a.start.localeCompare(b.start));
+    }
     save(); closeSheet(); paint();
   };
 }
-function closeSheet(){ sheet.classList.remove('open'); backdrop.classList.remove('open'); sheet.setAttribute('aria-hidden','true'); document.body.style.overflow='auto'; }
+
+function closeSheet(){
+  sheet.classList.remove('open'); backdrop.classList.remove('open');
+  sheet.setAttribute('aria-hidden','true'); document.body.style.overflow='auto';
+}
+
 paint();
