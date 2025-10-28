@@ -1,11 +1,9 @@
-// src/app.js
 import {
   auth, onAuthStateChanged, createAccount, signIn, signOutNow,
   db, bookingsCol, addDoc, doc, updateDoc, deleteDoc,
   onSnapshot, serverTimestamp, userIsAdmin
 } from "./firebase.js";
 
-// ---- Calendar helpers ----
 const ROOMS = ['Double','Twin','Deluxe','Standard','Family','Cottage','Sauna'];
 function isoLocal(d){ const y=d.getFullYear(); const m=String(d.getMonth()+1).padStart(2,'0'); const dd=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${dd}`; }
 function parseISO(s){ const [y,m,dd]=s.split('-').map(Number); const d=new Date(y,m-1,dd); d.setHours(0,0,0,0); return d; }
@@ -15,11 +13,9 @@ function gridForMonth(d){ const start=startOfMonth(d); const startWeekDay=(start
 function monthLabel(d){ return d.toLocaleDateString('en-GB',{month:'long',year:'numeric'}); }
 function sameDate(a,b){ return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
 
-// ---- State ----
-let state = { view: isoLocal(new Date()), bookings: {} };
-let currentUser=null, isAdmin=false, unsub=null;
+let state = { view: isoLocal(new Date()), _all: [] };
+let isAdmin=false, unsub=null;
 
-// ---- Auth UI ----
 const emailEl = document.getElementById('emailInput');
 const passEl = document.getElementById('passwordInput');
 const signinBtn = document.getElementById('signinBtn');
@@ -37,33 +33,34 @@ signupBtn.onclick = async ()=>{
 };
 signoutBtn.onclick = ()=> signOutNow();
 
+function startListener(){
+  stopListener();
+  unsub = onSnapshot(bookingsCol, (snap)=>{
+    const all=[]; snap.forEach(ds=> all.push({ id: ds.id, ...ds.data() }));
+    state._all = all; paint();
+  }, (err)=>{
+    console.error(err); alert('Live update error: '+(err.message||err));
+  });
+}
+function stopListener(){ if (unsub){ try{unsub();}catch{}; unsub=null; } }
+
 onAuthStateChanged(auth, async (u)=>{
-  currentUser = u || null;
-  isAdmin = false;
-  if (u) {
-    signoutBtn.style.display = 'inline-block';
-    signinBtn.style.display = 'none';
-    signupBtn.style.display = 'none';
-    emailEl.style.display = 'none';
-    passEl.style.display = 'none';
+  if (u){
+    signoutBtn.style.display='inline-block'; signinBtn.style.display='none'; signupBtn.style.display='none'; emailEl.style.display='none'; passEl.style.display='none';
     isAdmin = await userIsAdmin(u.uid);
-  } else {
-    signoutBtn.style.display = 'none';
-    signinBtn.style.display = 'inline-block';
-    signupBtn.style.display = 'inline-block';
-    emailEl.style.display = 'inline-block';
-    passEl.style.display = 'inline-block';
+    roleBadge.textContent = isAdmin ? 'Admin (edit allowed)' : 'Read-only';
+    startListener(); // only after login
+  }else{
+    signoutBtn.style.display='none'; signinBtn.style.display='inline-block'; signupBtn.style.display='inline-block'; emailEl.style.display='inline-block'; passEl.style.display='inline-block';
+    roleBadge.textContent = 'Read-only';
+    stopListener(); state._all=[]; paint();
   }
-  roleBadge.textContent = isAdmin ? 'Admin (edit allowed)' : 'Read-only';
-  attachMonthListener();
 });
 
-// ---- Month nav ----
 const monthLabelEl=document.getElementById('monthLabel');
 document.getElementById('prev').onclick=()=>{ const d=parseISO(state.view); d.setMonth(d.getMonth()-1); state.view=isoLocal(d); paint(); };
 document.getElementById('next').onclick=()=>{ const d=parseISO(state.view); d.setMonth(d.getMonth()+1); state.view=isoLocal(d); paint(); };
 
-// ---- CSV Export ----
 document.getElementById('exportAllBtn').onclick=()=> downloadCSV('bookings.csv', flattenBookings());
 document.getElementById('exportMonthBtn').onclick=()=>{
   const d=parseISO(state.view), m=d.getMonth()+1, y=d.getFullYear();
@@ -78,50 +75,22 @@ function downloadCSV(filename,rows){
   const blob=new Blob([lines.join('\n')],{type:'text/csv;charset=utf-8;'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=filename; a.click(); URL.revokeObjectURL(url);
 }
 
-// ---- Global live listener (all bookings) ----
-function attachMonthListener(){
-  if (unsub) { unsub(); unsub=null; }
-  unsub = onSnapshot(bookingsCol, (snap)=>{
-    // Keep everything in memory once; filter per month in paint()
-    const all=[];
-    snap.forEach(ds=> all.push({ id: ds.id, ...ds.data() }));
-    state._allBookings = all; // store raw list
-    paint();
-  }, (err)=>{
-    console.error(err);
-    alert('Live update error: '+(err.message||err));
-    paint();
-  });
-}
-
-// ---- Render ----
-const roomsGrid=document.getElementById('roomsGrid');
 function currentMonthRange(){
   const d=parseISO(state.view);
-  const startISO = isoLocal(new Date(d.getFullYear(), d.getMonth(), 1));
-  const endISO   = isoLocal(new Date(d.getFullYear(), d.getMonth()+1, 0));
-  return [startISO, endISO];
+  const s = isoLocal(new Date(d.getFullYear(), d.getMonth(), 1));
+  const e = isoLocal(new Date(d.getFullYear(), d.getMonth()+1, 0));
+  return [s,e];
 }
-function monthBookingsByRoom(){
-  const [startISO, endISO] = currentMonthRange();
-  const byRoom={}; for(const r of ROOMS) byRoom[r]=[];
-  for(const b of (state._allBookings||[])){
-    if (b.end >= startISO && b.start <= endISO) {
-      if(!byRoom[b.room]) byRoom[b.room]=[];
-      byRoom[b.room].push(b);
-    }
-  }
-  return byRoom;
+function monthByRoom(){
+  const [s,e] = currentMonthRange();
+  const by={}; for(const r of ROOMS) by[r]=[];
+  for(const b of state._all){ if (b.end>=s && b.start<=e){ (by[b.room]||(by[b.room]=[])).push(b);} }
+  return by;
 }
-function flattenBookings(){
-  const byRoom = monthBookingsByRoom();
-  const rows=[]; for(const room of ROOMS){ for(const b of (byRoom[room]||[])){ rows.push({room, ...b}); } } return rows;
-}
-function isBooked(room, dayISO){
-  const byRoom = monthBookingsByRoom();
-  return (byRoom[room]||[]).some(b=> dayISO>=b.start && dayISO<=b.end);
-}
+function flattenBookings(){ const by=monthByRoom(); const out=[]; for(const r of ROOMS){ for(const b of (by[r]||[])) out.push({room:r, ...b}); } return out; }
+function isBooked(room, dayISO){ const by=monthByRoom(); return (by[room]||[]).some(b=> dayISO>=b.start && dayISO<=b.end); }
 
+const roomsGrid=document.getElementById('roomsGrid');
 function paint(){
   const d=parseISO(state.view); monthLabelEl.textContent=monthLabel(d); roomsGrid.innerHTML='';
 
@@ -155,7 +124,6 @@ function paint(){
   }
 }
 
-// ---- Bottom sheet + CRUD (writes require admin) ----
 const sheet=document.getElementById('sheet'); const backdrop=document.getElementById('sheetBackdrop'); const form=document.getElementById('sheetForm');
 const startInput=document.getElementById('startInput'); const endInput=document.getElementById('endInput');
 const nameInput=document.getElementById('nameInput'); const noteInput=document.getElementById('noteInput');
@@ -181,8 +149,7 @@ function closeSheet(){
 
 async function onDayTap(room,date){
   const dISO=isoLocal(date);
-  const byRoom = monthBookingsByRoom();
-  const list=byRoom[room]||[];
+  const by=monthByRoom(); const list=by[room]||[];
   const hit=list.find(b=> dISO>=b.start && dISO<=b.end);
   if(hit){ openSheet('edit', room, hit); return; }
   openSheet('create', room, {start:dISO, end:dISO, name:'', note:''});
@@ -221,5 +188,4 @@ form.onsubmit = async (e)=>{
   }
 };
 
-// Initial render (listener will populate bookings)
 paint();
