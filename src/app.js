@@ -47,9 +47,12 @@ function stopListener(){ if (unsub){ try{unsub();}catch{}; unsub=null; } }
 onAuthStateChanged(auth, async (u)=>{
   if (u){
     signoutBtn.style.display='inline-block'; signinBtn.style.display='none'; signupBtn.style.display='none'; emailEl.style.display='none'; passEl.style.display='none';
-    isAdmin = await userIsAdmin(u.uid);
+    roleBadge.textContent = 'Read-only';
+    startListener(); // start immediately
+    try {
+      isAdmin = await userIsAdmin(u.uid);
+    } catch { isAdmin = false; }
     roleBadge.textContent = isAdmin ? 'Admin (edit allowed)' : 'Read-only';
-    startListener(); // only after login
   }else{
     signoutBtn.style.display='none'; signinBtn.style.display='inline-block'; signupBtn.style.display='inline-block'; emailEl.style.display='inline-block'; passEl.style.display='inline-block';
     roleBadge.textContent = 'Read-only';

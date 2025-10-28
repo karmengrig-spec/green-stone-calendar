@@ -32,10 +32,15 @@ export async function signIn(email, password) {
 export function signOutNow() { return signOut(auth); }
 export { onAuthStateChanged };
 
+// Safe admin check
 export async function userIsAdmin(uid) {
   if (!uid) return false;
-  const snap = await getDoc(doc(db, "admins", uid));
-  return snap.exists();
+  try {
+    const snap = await getDoc(doc(db, "admins", uid));
+    return snap.exists();
+  } catch (e) {
+    return false;
+  }
 }
 
 export const bookingsCol = collection(db, "bookings");
