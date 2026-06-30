@@ -1,6 +1,3 @@
-import { initializeApp, cert, getApps } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
-
 const serviceAccountRaw = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64 || process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
 const firebaseApiKey = process.env.FIREBASE_API_KEY;
 const firebaseProjectId = process.env.FIREBASE_PROJECT_ID;
@@ -8,7 +5,12 @@ const useAdmin = Boolean(serviceAccountRaw);
 const useRest = !useAdmin && Boolean(firebaseApiKey && firebaseProjectId);
 let db;
 
-if (useAdmin) {
+async function ensureAdminInitialized() {
+  if (db) return;
+  // dynamically import admin SDK only when needed
+  const { initializeApp, cert, getApps } = await import('firebase-admin/app');
+  const { getFirestore } = await import('firebase-admin/firestore');
+
   let serviceAccount;
   try {
     const raw = serviceAccountRaw.trim();
@@ -95,6 +97,7 @@ export default async function handler(req, res) {
       return res.status(500).send('Missing Firebase server configuration. Set FIREBASE_SERVICE_ACCOUNT_BASE64/JSON or FIREBASE_API_KEY and FIREBASE_PROJECT_ID.');
     }
 
+    if (useAdmin) await ensureAdminInitialized();
     const bookings = useAdmin ? await getBookingsAdmin(room) : await getBookingsRest(room);
 
     const ics = [
