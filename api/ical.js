@@ -1,32 +1,16 @@
-const serviceAccountRaw = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64 || process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-const firebaseApiKey = process.env.FIREBASE_API_KEY;
-const firebaseProjectId = process.env.FIREBASE_PROJECT_ID;
-const useAdmin = Boolean(serviceAccountRaw);
-const useRest = !useAdmin && Boolean(firebaseApiKey && firebaseProjectId);
-let db;
+const firebaseConfig = {
+  apiKey: 'AIzaSyACYY5Or9OGv98y9fDxVUqEUzro2CbpoVE',
+  authDomain: 'green-stone-calendar.firebaseapp.com',
+  projectId: 'green-stone-calendar',
+  storageBucket: 'green-stone-calendar.firebasestorage.app',
+  messagingSenderId: '946090298149',
+  appId: '1:946090298149:web:8a8aa5d4c63d511b1c68cc',
+  measurementId: 'G-8YDMZ2SNGS'
+};
 
-async function ensureAdminInitialized() {
-  if (db) return;
-  // dynamically import admin SDK only when needed
-  const { initializeApp, cert, getApps } = await import('firebase-admin/app');
-  const { getFirestore } = await import('firebase-admin/firestore');
+const firestoreBaseUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents`;
 
-  let serviceAccount;
-  try {
-    const raw = serviceAccountRaw.trim();
-    const decoded = raw.startsWith('{') ? raw : Buffer.from(raw, 'base64').toString('utf8');
-    serviceAccount = JSON.parse(decoded);
-  } catch (err) {
-    throw new Error('Invalid Firebase service account JSON: ' + err.message);
-  }
-
-  if (!getApps().length) {
-    initializeApp({ credential: cert(serviceAccount) });
-  }
-
-  db = getFirestore();
-}
-
+// Read-only Firestore export for the calendar feed.
 function formatDate(dateStr) {
   return dateStr.replace(/-/g, '');
 }
@@ -38,10 +22,18 @@ function nextDate(dateStr) {
   return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}-${String(dt.getUTCDate()).padStart(2, '0')}`;
 }
 
+function escapeIcsText(value = '') {
+  return String(value)
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+    .replace(/\r?\n/g, ' ');
+}
+
 function parseFirestoreDocument(doc) {
-  const fields = doc.document.fields || {};
+  const fields = doc.document?.fields || {};
   return {
-    id: doc.document.name.split('/').pop(),
+    id: doc.document?.name?.split('/').pop() || '',
     start: fields.start?.stringValue || '',
     end: fields.end?.stringValue || '',
     name: fields.name?.stringValue || '',
@@ -49,41 +41,31 @@ function parseFirestoreDocument(doc) {
   };
 }
 
-async function getBookingsRest(room) {
-  const url = `https://firestore.googleapis.com/v1/projects/${firebaseProjectId}/databases/(default)/documents:runQuery?key=${firebaseApiKey}`;
-  const body = {
-    structuredQuery: {
-      from: [{ collectionId: 'bookings' }],
-      where: {
-        fieldFilter: {
-          field: { fieldPath: 'room' },
-          op: 'EQUAL',
-          value: { stringValue: room }
-        }
-      }
-    }
-  };
-
-  const response = await fetch(url, {
+async function getBookings(room) {
+  const response = await fetch(`${firestoreBaseUrl}:runQuery?key=${firebaseConfig.apiKey}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: 'bookings' }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: 'room' },
+            op: 'EQUAL',
+            value: { stringValue: room }
+          }
+        }
+      }
+    })
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Firestore REST query failed: ${response.status} ${response.statusText} ${errorText}`);
+    throw new Error(`Firestore query failed: ${response.status} ${response.statusText} ${errorText}`);
   }
 
   const json = await response.json();
-  return json.filter((item) => item.document).map(parseFirestoreDocument);
-}
-
-async function getBookingsAdmin(room) {
-  const snapshot = await db.collection('bookings').where('room', '==', room).get();
-  const bookings = [];
-  snapshot.forEach((doc) => bookings.push({ id: doc.id, ...doc.data() }));
-  return bookings;
+  return (Array.isArray(json) ? json : []).filter((item) => item.document).map(parseFirestoreDocument);
 }
 
 export default async function handler(req, res) {
@@ -93,12 +75,7 @@ export default async function handler(req, res) {
       return res.status(400).send('Missing room name. Set ?room=<room>.');
     }
 
-    if (!useAdmin && !useRest) {
-      return res.status(500).send('Missing Firebase server configuration. Set FIREBASE_SERVICE_ACCOUNT_BASE64/JSON or FIREBASE_API_KEY and FIREBASE_PROJECT_ID.');
-    }
-
-    if (useAdmin) await ensureAdminInitialized();
-    const bookings = useAdmin ? await getBookingsAdmin(room) : await getBookingsRest(room);
+    const bookings = await getBookings(room);
 
     const ics = [
       'BEGIN:VCALENDAR',
@@ -110,11 +87,11 @@ export default async function handler(req, res) {
     bookings.forEach((b) => {
       ics.push('BEGIN:VEVENT');
       ics.push(`UID:${b.id}@greenstone`);
-      ics.push(`SUMMARY:${(b.name || 'Booking').replace(/\r?\n/g, ' ')}`);
+      ics.push(`SUMMARY:${escapeIcsText(b.name || 'Booking')}`);
       ics.push(`DTSTART;VALUE=DATE:${formatDate(b.start)}`);
       ics.push(`DTEND;VALUE=DATE:${formatDate(nextDate(b.end))}`);
       if (b.note) {
-        ics.push(`DESCRIPTION:${b.note.replace(/\r?\n/g, ' ')}`);
+        ics.push(`DESCRIPTION:${escapeIcsText(b.note)}`);
       }
       ics.push('END:VEVENT');
     });
